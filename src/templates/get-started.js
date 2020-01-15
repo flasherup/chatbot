@@ -1,3 +1,5 @@
+'use strict';
+const constants = require('./constants')
 module.exports = (userId) => {
     return {
         recipient: {
@@ -16,11 +18,11 @@ module.exports = (userId) => {
                                 {
                                     type: 'postback',
                                     title: 'Show my reminders',
-                                    payload: 'show_reminders'
-                                }, {
+                                    payload: constants.SHOW_REMINDERS
+                                },{
                                     type: 'postback',
-                                    title: 'Add new reminder',
-                                    payload: 'create_reminder'
+                                    title: 'Add remind',
+                                    payload: constants.CREATE_REMINDER
                                 }
                             ]
                         }

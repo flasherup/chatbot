@@ -1,15 +1,12 @@
-const processMessage = require('./process-message');
-const processPostback = require('./process-postback');
+'use strict';
+const processEvent = require('./process-event');
 
 module.exports = (req, res) => {
+    console.log('message-webhook')
     if (req.body.object === 'page') {
         req.body.entry.forEach(entry => {
             entry.messaging.forEach(event => {
-                if (event.message && event.message.text) {
-                    processMessage(event);
-                } else if (event.postback) {
-                    processPostback(event);
-                }
+                processEvent(event);
             });
         });
 

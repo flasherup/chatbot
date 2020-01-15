@@ -1,4 +1,6 @@
+'use strict';
 const verifyWebhook = (req, res) => {
+    console.log('verifyWebhook');
     let VERIFY_TOKEN = 'chatbotfacebooktoken';
 
     let mode = req.query['hub.mode'];
