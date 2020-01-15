@@ -1,6 +1,6 @@
 'use strict';
 const Context = require('./Context');
-const Remind = require('./Remind');
+const Reminder = require('./Reminder');
 const dialogFlow = require('./dialog-flow');
 const constants = require('../templates/constants');
 const ctxConstants = require('./constants');
@@ -30,7 +30,7 @@ module.exports = class Bot {
         } 
 
         if (event.postback && event.postback.payload) {
-            this.processPostback(event.postback.payload, onResponseReady);
+            this.processPostBack(event.postback.payload, onResponseReady);
             return;
         } 
 
@@ -42,7 +42,6 @@ module.exports = class Bot {
         if (this.context.isInitialState()) {
             console.log('InitialState')
             const onAnswerReady = (queryResult) => {
-                console.log('onAnswerReady', queryResult)
                 if (queryResult !== null) {
                     callBack(this.getTemplate(queryResult, this.userId));
                     return;
@@ -55,50 +54,61 @@ module.exports = class Bot {
 
         if (this.context.isWaitForTextState()) {
             console.log('WaitForTextState')
-            this.context.collectRemindText(message)
-            this.context.setState(ctxConstants.CTX_WAIT_FOR_REMIND_TIME);
+            this.context.collectReminderText(message)
+            this.context.setState(ctxConstants.CTX_WAIT_FOR_REMINDER_DATE);
 
             callBack(setTimeTml((this.userId)))
             return;
         }
 
-        if (this.context.isWaitForTimeState()) {
+        if (this.context.isWaitForDateState()) {
             console.log('WaitForTimeState')
-            this.context.collectRemindDate(message)
-            this.collectRemind(this.context.getCollectedRemind())
-            this.context.reset();
-            callBack(remindSavedTml((this.userId)))
+            const onAnswerReady = (queryResult) => {
+                if (queryResult !== null && queryResult.allRequiredParamsPresent) {
+                    const date = parseTimeAndDate(queryResult)
+                    if (date != TIME_IS_NOT_RECOGNIZED) {
+                        this.context.collectReminderDate(date)
+                        this.collectRemind(this.context.getCollectedRemind())
+                        this.context.reset();
+                        callBack(remindSavedTml((this.userId)))
+                        return;
+                    }
+                }
+                callBack(setTimeTml((this.userId)));
+            }
+            dialogFlow(message, onAnswerReady);
             return;
         }
 
         console.log('state not found')
     }
 
-    processPostback(postback, callBack) {
-        console.log('postback', postback, this.userId);
-        if (postback === constants.SHOW_REMINDERS) {
+    processPostBack(postBack, callBack) {
+        console.log('postBack', postBack, this.userId);
+        if (postBack === constants.SHOW_REMINDERS) {
             callBack(listOfRemindersTml(this.userId, this.getReminders()));
             return;
         }
 
-        if (postback === constants.CREATE_REMINDER) {
-            this.context.setState(ctxConstants.CTX_WAIT_FOR_REMIND_TEXT);
+        if (postBack === constants.CREATE_REMINDER) {
+            this.context.setState(ctxConstants.CTX_WAIT_FOR_REMINDER_TEXT);
             callBack(createReminderTml(this.userId));
             return;
         }
 
-        if (postback === constants.CANCEL) {
+        if (postBack === constants.CANCEL) {
             this.context.reset();
             callBack(simpleResponseTml(this.userId, 'Remind creation canceled'));
             return;
         }
 
-        if (isDeletePostBack(postback)) {
-            const index = getDeleteIndex(postback);
-            console.log('Delete: ',index);
+        if (isDeletePostBack(postBack)) {
+            const id = getDeleteId(postBack);
+            if (id != -1) this.deleteRemind(id);
+            console.log('Delete: ',id);
         }
 
-        callBack(simpleResponseTml(this.userId, "postback not recognised"))
+        callBack(simpleResponseTml(this.userId, "postBack not recognized"))
     }
 
     errorMessage() { 
@@ -125,7 +135,17 @@ module.exports = class Bot {
         const storedData = this.store.get(this.userId);
         const save = Object.assign({},storedData);
         save.reminders = rem;
+        this.store.set(this.userId, save);
+    }
 
+    deleteRemind(id) {
+        const storedRem = this.getReminders();
+        let rem = storedRem.filter(item => item.getId() !== id)
+        rem.sort((a,b) => a.getJSDate() < b.getJSDate());
+
+        const storedData = this.store.get(this.userId);
+        const save = Object.assign({},storedData);
+        save.reminders = rem;
         this.store.set(this.userId, save);
     }
 
@@ -134,7 +154,7 @@ module.exports = class Bot {
         if (!raws) {
             console.log('cant get stored reminders')
         }
-        return raws.map(el => new Remind(el));
+        return raws.map(el => new Reminder(el));
     }
 }
 
@@ -142,10 +162,25 @@ const isDeletePostBack = postBack => {
     return (postBack.indexOf(constants.DELETE_PREFIX) != -1);
 };
 
-const getDeleteIndex = postBack => {
+const getDeleteId = postBack => {
     const s = postBack.split(':');
     if (s.length < 2) return -1;
     const index = parseInt(s[1]);
     if (isNaN(index)) return -1;
     return index;
 };
+
+const TIME_IS_NOT_RECOGNIZED = 'unrecognized';
+const parseTimeAndDate = query => {
+    const d = query.parameters.fields.date;
+    if (d && d.stringValue !== '') {
+        return d.stringValue;
+    }
+
+    const t = queryResult.parameters.fields.time;
+    if (t && t.stringValue !== '') {
+        return t.stringValue;
+    }
+    
+    return TIME_IS_NOT_RECOGNIZED
+}

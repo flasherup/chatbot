@@ -1,7 +1,7 @@
-module.exports = class Remind {
+module.exports = class Reminder {
     constructor(raw) {
         if (raw == null) {
-            this.id = Math.random()*1000000;
+            this.id = Math.round(Math.random()*1000000000);
             return;
         }
         this.id = raw.id;

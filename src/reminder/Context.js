@@ -1,22 +1,22 @@
 'use strict';
 const ctxConstants = require('./constants');
-const Remind = require('./Remind');
+const Reminder = require('./Reminder');
 
 module.exports = class Context {
    constructor() {
       this.reset();
    }
 
-   collectRemindText(text) {
-      this.remind.setText(text);
+   collectReminderText(text) {
+      this.reminder.setText(text);
    }
 
-   collectRemindDate(date) {
-      this.remind.setDate(date);
+   collectReminderDate(date) {
+      this.reminder.setDate(date);
    }
 
    getCollectedRemind() {
-      return this.remind;
+      return this.reminder;
    }
 
    //States
@@ -26,15 +26,15 @@ module.exports = class Context {
 
    reset() {
       this.resetState();
-      this.resetRemind();
+      this.resetReminder();
    }
 
    resetState() {
       this.state = null;
    }
 
-   resetRemind() {
-      this.remind = new Remind(null);
+   resetReminder() {
+      this.reminder = new Reminder(null);
    }
 
    isInitialState() {
@@ -42,10 +42,10 @@ module.exports = class Context {
    }
 
    isWaitForTextState() {
-      return this.state === ctxConstants.CTX_WAIT_FOR_REMIND_TEXT;
+      return this.state === ctxConstants.CTX_WAIT_FOR_REMINDER_TEXT;
    }
 
-   isWaitForTimeState() {
-      return this.state === ctxConstants.CTX_WAIT_FOR_REMIND_TIME;
+   isWaitForDateState() {
+      return this.state === ctxConstants.CTX_WAIT_FOR_REMINDER_DATE;
    }
 };

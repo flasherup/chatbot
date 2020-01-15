@@ -13,7 +13,7 @@ const config = {
 
 const sessionClient = new dialogflow.SessionsClient(config);
 
-module.exports = (message, onAnsverReady) => {
+module.exports = (message, onAnswerReady) => {
     console.log("message", message)
     const sessionPath = sessionClient.sessionPath(projectId, sessionId);
     const request = {
@@ -30,9 +30,9 @@ module.exports = (message, onAnsverReady) => {
         .detectIntent(request)
         .then(responses => {
             if (responses.length === 0) {
-                onAnsverReady(null)
+                onAnswerReady(null)
             } else {
-                onAnsverReady(responses[0].queryResult);
+                onAnswerReady(responses[0].queryResult);
             }
         })
         .catch(err => {
