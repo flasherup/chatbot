@@ -1,5 +1,6 @@
 'use strict';
 const constants = require('./constants');
+const { dateToString } = require('../reminder/utils/date-utils');
 const generateTemplateList = reminders => {
     console.log('reminders', reminders)
     if (!reminders) {
@@ -12,13 +13,13 @@ const generateTemplateList = reminders => {
         el => {
             console.log('el', el);
             return {
-                title: el.getText(),
-                subtitle: el.getDate(),
+                title: el.text,
+                subtitle: dateToString(el.date),
                 buttons: [
                     {
                         type: 'postback',
                         title: 'Delete',
-                        payload: constants.DELETE_PREFIX + el.getId()
+                        payload: constants.DELETE_PREFIX + el.id
                     },
                 ]
             };

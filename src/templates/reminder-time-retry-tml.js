@@ -1,5 +1,5 @@
 'use strict';
-const constants = require('./constants');
+const constants = require('./constants')
 module.exports = (userId) => {
     return {
         recipient: {
@@ -12,13 +12,13 @@ module.exports = (userId) => {
                     template_type: 'generic',
                     elements: [
                         {
-                            title: 'Remind creation complete',
-                            subtitle: 'You remind saved',
+                            title: 'We can not recognize time or date.',
+                            subtitle: 'Please specify time in different way',
                             buttons: [
                                 {
                                     type: 'postback',
-                                    title: 'Show my reminders',
-                                    payload: constants.SHOW_REMINDERS
+                                    title: 'Cancel',
+                                    payload: constants.CANCEL
                                 }
                             ]
                         }

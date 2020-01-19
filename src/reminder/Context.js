@@ -8,14 +8,14 @@ module.exports = class Context {
    }
 
    collectReminderText(text) {
-      this.reminder.setText(text);
+      this.reminder.text = text;
    }
 
    collectReminderDate(date) {
-      this.reminder.setDate(date);
+      this.reminder.date = new Date(date);
    }
 
-   getCollectedRemind() {
+   getCollectedReminder() {
       return this.reminder;
    }
 

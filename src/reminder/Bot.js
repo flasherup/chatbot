@@ -1,186 +1,207 @@
 'use strict';
 const Context = require('./Context');
-const Reminder = require('./Reminder');
-const dialogFlow = require('./dialog-flow');
-const constants = require('../templates/constants');
+const tmlConstants = require('../templates/constants');
 const ctxConstants = require('./constants');
+const pbUtils = require('./utils/post-back-utils')
 
-const simpleResponseTml = require('../templates/simple-response');
-const getStartedTml = require('../templates/get-started');
-const listOfRemindersTml = require('../templates/reminders-list');
-const createReminderTml = require('../templates/create-reminder');
-const setTimeTml = require('../templates/set-time');
-const remindSavedTml = require('../templates/remind-saved');
-
+const simpleResponseTml = require('../templates/simple-response-tml');
+const getStartedTml = require('../templates/get-started-tml');
+const remindersListTml = require('../templates/reminders-list-tml');
+const remindersEmptyTml = require('../templates/reminders-empty-tml');
+const reminderCreateTml = require('../templates/reminder-create-tml');
+const reminderTimeTml = require('../templates/reminder-time-tml');
+const reminderTimeRetryTml = require('../templates/reminder-time-retry-tml');
+const remindSavedTml = require('../templates/reminder-saved-tml');
+const reminderAlert = require('../templates/reminder-alert-tml');
+const deleteCompleteTml = require('../templates/delete-complete-tml');
 
 module.exports = class Bot {
-    constructor(userId, store) {
+    constructor(userId, store, dialogFlow) {
         this.userId = userId;
         this.context = new Context();
         this.store = store;
-        if (!this.store.has(this.userId))
-            this.store.set(this.userId, {reminders:[]})
+        this.dialogFlow = dialogFlow;
+        if (!this.store.hasUser(this.userId))
+            this.store.createUser(this.userId)
     }
 
-    processEvent(event, onResponseReady) {
+    getReadyReminders() {
+        const rem = this.store.getReminders(this.userId);
+        const curDate = new Date();
+        let res = [];
+        let el;
+        for (let i=0; i<rem.length; i++) {
+            el = rem[i]
+            if (el.date < curDate) {
+                res.push(reminderAlert(this.userId, el));
+            }
+        }
+        return res;
+    }
+
+    processEvent(event) {
         const userId = event.sender.id;
         if (event.message && event.message.text) {
-            this.processMessage(event.message.text, onResponseReady);
-            return;
+            return this.processMessage(event.message.text);
         } 
-
         if (event.postback && event.postback.payload) {
-            this.processPostBack(event.postback.payload, onResponseReady);
-            return;
+            return this.processPostBack(event.postback.payload);
         } 
-
-        onResponseReady(this.errorMessage(userId));
+        return new Promise((_, reject) => {
+            reject(new Error(`can not process event, invalid event:${ event }`));
+        });
     }
 
-    processMessage(message, callBack) {
+    processMessage(message) {
         console.log('processMessage')
         if (this.context.isInitialState()) {
-            console.log('InitialState')
-            const onAnswerReady = (queryResult) => {
-                if (queryResult !== null) {
-                    callBack(this.getTemplate(queryResult, this.userId));
-                    return;
-                }
-                callBack(errorMessage(userId));
-            }
-            dialogFlow(message, onAnswerReady);
-            return;
+            return this._checkUserInputForCommand(message);
         }
 
         if (this.context.isWaitForTextState()) {
-            console.log('WaitForTextState')
-            this.context.collectReminderText(message)
-            this.context.setState(ctxConstants.CTX_WAIT_FOR_REMINDER_DATE);
-
-            callBack(setTimeTml((this.userId)))
-            return;
+            return this._saveReminderMessage(message);
         }
 
         if (this.context.isWaitForDateState()) {
-            console.log('WaitForTimeState')
-            const onAnswerReady = (queryResult) => {
-                if (queryResult !== null && queryResult.allRequiredParamsPresent) {
-                    const date = parseTimeAndDate(queryResult)
-                    if (date != TIME_IS_NOT_RECOGNIZED) {
-                        this.context.collectReminderDate(date)
-                        this.collectRemind(this.context.getCollectedRemind())
-                        this.context.reset();
-                        callBack(remindSavedTml((this.userId)))
-                        return;
-                    }
-                }
-                callBack(setTimeTml((this.userId)));
-            }
-            dialogFlow(message, onAnswerReady);
-            return;
+            return this._recognizeAndSaveReminderDate(message);
         }
 
-        console.log('state not found')
+        return new Promise((_,reject) => { 
+            reject(new Error('Massage process error, state not found.'));
+        });
     }
 
-    processPostBack(postBack, callBack) {
+    processPostBack(postBack) {
         console.log('postBack', postBack, this.userId);
-        if (postBack === constants.SHOW_REMINDERS) {
-            callBack(listOfRemindersTml(this.userId, this.getReminders()));
-            return;
-        }
-
-        if (postBack === constants.CREATE_REMINDER) {
-            this.context.setState(ctxConstants.CTX_WAIT_FOR_REMINDER_TEXT);
-            callBack(createReminderTml(this.userId));
-            return;
-        }
-
-        if (postBack === constants.CANCEL) {
-            this.context.reset();
-            callBack(simpleResponseTml(this.userId, 'Remind creation canceled'));
-            return;
-        }
-
-        if (isDeletePostBack(postBack)) {
-            const id = getDeleteId(postBack);
-            if (id != -1) this.deleteRemind(id);
-            console.log('Delete: ',id);
-        }
-
-        callBack(simpleResponseTml(this.userId, "postBack not recognized"))
+        return new Promise((resolve, reject) => {
+            if (postBack === tmlConstants.SHOW_REMINDERS) {
+                resolve(resolve(this._getReminderListTemplate()));
+                return;
+            }
+    
+            if (postBack === tmlConstants.CREATE_REMINDER) {
+                this.context.setState(ctxConstants.CTX_WAIT_FOR_REMINDER_TEXT);
+                resolve(reminderCreateTml(this.userId));
+                return;
+            }
+    
+            if (postBack === tmlConstants.CANCEL) {
+                if (this.context.isInitialState()) {
+                    reject(new Error('Nothing to cancel'))
+                }
+                this.context.reset();
+                resolve(simpleResponseTml(this.userId, 'Remind creation canceled'));
+                return;
+            }
+    
+            if (pbUtils.isDeletePostBack(postBack)) {
+                const id = pbUtils.extractId(postBack);
+                if (id != -1) {
+                    const reminder = this.store.deleteReminder(this.userId, id);
+                    resolve(deleteCompleteTml(this.userId, reminder));
+                } 
+                else reject(new Error('Id not recognized.'))
+                return;
+            }
+    
+            if (pbUtils.isConfirmPostBack(postBack)) {
+                const id = pbUtils.extractId(postBack);
+                if (id != -1) {
+                    this.store.deleteReminder(this.userId, id);
+                    resolve(null);
+                }
+                else reject(new Error('Id not recognized.'));
+                
+                return;
+            }
+    
+            if (pbUtils.isSnoozePostBack(postBack)) {
+                const id = pbUtils.extractId(postBack);
+                if (id != -1) {
+                    this.snoozeReminder(id);
+                    resolve(null);
+                } else reject(new Error('Id not recognized.'));
+                return;
+            }
+            reject(new Error('postBack not recognized'))
+        });
     }
 
     errorMessage() { 
-        return simpleResponseTml(this.userId, "Something goes wrong :(, try again pleas");
+        return simpleResponseTml(this.userId, 'Something goes wrong :(, try again pleas');
     }
 
-    getTemplate(queryResult) {
-        if (queryResult.action === 'reminders_list') {
-            return listOfRemindersTml(this.userId, this.getReminders());
-        } 
-
-        if (queryResult.action === 'get_started') {
-            return getStartedTml(this.userId);
+    snoozeReminder(id) {
+        const rem = this.store.deleteReminder(this.userId, id);
+        if (!rem) {
+            return;
         }
-
-        return simpleResponseTml(this.userId, queryResult.fulfillmentText);
+        const d = rem.date;
+        d.setMinutes(d.getMinutes() + ctxConstants.SNOOZE_TIME);
+        rem.date = d;
+        this.store.addReminder(this.userId, rem)
     }
 
-    collectRemind(remind) {
-        const storedRem = this.getReminders();
-        let rem = [...storedRem, remind];
-        rem.sort((a,b) => a.getJSDate() < b.getJSDate());
-
-        const storedData = this.store.get(this.userId);
-        const save = Object.assign({},storedData);
-        save.reminders = rem;
-        this.store.set(this.userId, save);
+    _checkUserInputForCommand(message) {
+        return new Promise((resolve, reject) => {
+            this.dialogFlow.message(message)
+                .then((queryResult) => {
+                        if (queryResult.action === 'reminders_list') {
+                                resolve(this._getReminderListTemplate());
+                            return;
+                        }
+                        if (queryResult.action === 'get_started') {
+                            resolve(getStartedTml(this.userId));
+                            return;
+                        }
+                        resolve(simpleResponseTml(this.userId, queryResult.fulfillmentText));
+                })
+                .catch((err) => {
+                    reject(err);
+                });
+        });
     }
 
-    deleteRemind(id) {
-        const storedRem = this.getReminders();
-        let rem = storedRem.filter(item => item.getId() !== id)
-        rem.sort((a,b) => a.getJSDate() < b.getJSDate());
-
-        const storedData = this.store.get(this.userId);
-        const save = Object.assign({},storedData);
-        save.reminders = rem;
-        this.store.set(this.userId, save);
+    _saveReminderMessage(message) {
+        return new Promise((resolve) => {
+            this.context.collectReminderText(message);
+            this.context.setState(ctxConstants.CTX_WAIT_FOR_REMINDER_DATE);
+            resolve(reminderTimeTml((this.userId)));
+        });
     }
 
-    getReminders() {
-        const raws = this.store.get(this.userId).reminders;
-        if (!raws) {
-            console.log('cant get stored reminders')
+    _recognizeAndSaveReminderDate(message) {
+        return new Promise((resolve, reject) => {
+            this.dialogFlow.message(message)
+                .then((queryResult) => {
+                if (queryResult && queryResult.allRequiredParamsPresent) {
+                    const date = pbUtils.parseTimeAndDate(queryResult)
+                    if (date !== pbUtils.TIME_IS_NOT_RECOGNIZED) {
+                        this.context.collectReminderDate(date);
+                        const reminder = this.context.getCollectedReminder();
+                        this.store.addReminder(this.userId, reminder);
+                        this.context.reset();
+                        resolve(remindSavedTml(this.userId, reminder));
+                    } else {
+                        resolve(reminderTimeRetryTml((this.userId)));
+                    }
+                } else {
+                    reject(new Error('can not parse time'));
+                }
+                
+                })
+                .catch((err) => {
+                    reject(err);
+                });
+        });
+    }
+
+    _getReminderListTemplate() {
+        const reminders = this.store.getReminders(this.userId);
+        if (!reminders || reminders.length == 0) {
+            return remindersEmptyTml(this.userId);
+        } else {
+            return remindersListTml(this.userId, reminders);
         }
-        return raws.map(el => new Reminder(el));
     }
-}
-
-const isDeletePostBack = postBack => {
-    return (postBack.indexOf(constants.DELETE_PREFIX) != -1);
-};
-
-const getDeleteId = postBack => {
-    const s = postBack.split(':');
-    if (s.length < 2) return -1;
-    const index = parseInt(s[1]);
-    if (isNaN(index)) return -1;
-    return index;
-};
-
-const TIME_IS_NOT_RECOGNIZED = 'unrecognized';
-const parseTimeAndDate = query => {
-    const d = query.parameters.fields.date;
-    if (d && d.stringValue !== '') {
-        return d.stringValue;
-    }
-
-    const t = queryResult.parameters.fields.time;
-    if (t && t.stringValue !== '') {
-        return t.stringValue;
-    }
-    
-    return TIME_IS_NOT_RECOGNIZED
 }

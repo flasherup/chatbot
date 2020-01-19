@@ -12,8 +12,7 @@ module.exports = (userId) => {
                     template_type: 'generic',
                     elements: [
                         {
-                            title: 'Remind creation step 2',
-                            subtitle: 'Specify a date/time',
+                            title: 'Type reminder text',
                             buttons: [
                                 {
                                     type: 'postback',
