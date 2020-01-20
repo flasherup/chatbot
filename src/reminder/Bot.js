@@ -104,7 +104,7 @@ module.exports = class Bot {
                 const id = pbUtils.extractId(postBack);
                 if (id != -1) {
                     const reminder = this.store.deleteReminder(this.userId, id);
-                    resolve(deleteCompleteTml(this.userId, reminder));
+                    if (reminder)resolve(deleteCompleteTml(this.userId, reminder));
                 } 
                 else reject(new Error('Id not recognized.'))
                 return;
