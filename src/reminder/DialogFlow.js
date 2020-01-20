@@ -16,6 +16,8 @@ class DialogFlow {
         this.sessionClient = sessionClient;
     }
 
+    //Send message to Dialog Flow API
+    //returns queryResult 
     message(msg) {
         const sessionPath = this.sessionClient.sessionPath(projectId, sessionId);
         const request = {
