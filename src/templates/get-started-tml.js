@@ -21,7 +21,7 @@ module.exports = (userId) => {
                                     payload: constants.SHOW_REMINDERS
                                 },{
                                     type: 'postback',
-                                    title: 'Add remind',
+                                    title: 'Add reminder',
                                     payload: constants.CREATE_REMINDER
                                 }
                             ]
