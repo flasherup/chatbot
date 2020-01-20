@@ -25,6 +25,8 @@ module.exports = class Bot {
             this.store.createUser(this.userId)
     }
 
+    //Return all reminders that ready to fire
+    //or empty array
     getReadyReminders() {
         const rem = this.store.getReminders(this.userId);
         const curDate = new Date();
@@ -39,6 +41,8 @@ module.exports = class Bot {
         return res;
     }
 
+    //Trying to read a message or postBack from event
+    //return promise which will resolve with message template 
     processEvent(event) {
         const userId = event.sender.id;
         if (event.message && event.message.text) {
@@ -52,6 +56,8 @@ module.exports = class Bot {
         });
     }
 
+    //Process messages 
+    //return promise which will resolve with message template
     processMessage(message) {
         if (this.context.isInitialState()) {
             return this._checkUserInputForCommand(message);
@@ -70,6 +76,8 @@ module.exports = class Bot {
         });
     }
 
+    //Process postbaks
+    //return promise which will resolve with message template
     processPostBack(postBack) {
         return new Promise((resolve, reject) => {
             if (postBack === tmlConstants.SHOW_REMINDERS) {
@@ -124,10 +132,9 @@ module.exports = class Bot {
         });
     }
 
-    errorMessage() { 
-        return simpleResponseTml(this.userId, 'Something goes wrong :(, try again pleas');
-    }
-
+    //Snooze reminder
+    //delete old and create new one 
+    //with the same time + rmdConstants.SNOOZE_TIME
     snoozeReminder(id) {
         const rem = this.store.deleteReminder(this.userId, id);
         if (!rem) {
@@ -139,6 +146,10 @@ module.exports = class Bot {
         this.store.addReminder(this.userId, rem)
     }
 
+    //Sends message to Dialog Flow
+    //and che the response
+    //if command detected
+    //than resolve promise with template message
     _checkUserInputForCommand(message) {
         return new Promise((resolve, reject) => {
             this.dialogFlow.message(message)
@@ -164,6 +175,8 @@ module.exports = class Bot {
         });
     }
 
+    //Save message
+    //and resolve promise with Time input template
     _saveReminderMessage(message) {
         return new Promise((resolve) => {
             this.context.collectReminderText(message);
@@ -172,6 +185,9 @@ module.exports = class Bot {
         });
     }
 
+    //Trying to recognize time and date
+    //In success save reminder and resolve promise with success message
+    //In false resolve promise with retry message 
     _recognizeAndSaveReminderDate(message) {
         return new Promise((resolve, reject) => {
             this.dialogFlow.message(message)
@@ -198,6 +214,8 @@ module.exports = class Bot {
         });
     }
 
+    //Return message template with reminders list
+    //If there is no any reminders, send message about lack of reminders
     _getReminderListTemplate() {
         const reminders = this.store.getReminders(this.userId);
         if (!reminders || reminders.length == 0) {
