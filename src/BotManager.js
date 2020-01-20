@@ -20,7 +20,7 @@ class BotManager {
         if (!this.bots[userId]) this.bots[userId] = new Bot(userId, store, dialogFlow)
         
         this.bots[userId].processEvent(event).then(resp => {
-            sendMessage(resp);
+            if (resp) sendMessage(resp);
         }).catch( err => {
             console.log('can not process event', err)
         });

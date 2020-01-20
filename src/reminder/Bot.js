@@ -109,7 +109,6 @@ module.exports = class Bot {
                     resolve(null);
                 }
                 else reject(new Error('Id not recognized.'));
-                
                 return;
             }
     
