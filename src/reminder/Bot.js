@@ -1,7 +1,7 @@
 'use strict';
 const Context = require('./Context');
 const tmlConstants = require('../templates/constants');
-const ctxConstants = require('./constants');
+const rmdConstants = require('./constants');
 const pbUtils = require('./utils/post-back-utils')
 
 const simpleResponseTml = require('../templates/simple-response-tml');
@@ -53,7 +53,6 @@ module.exports = class Bot {
     }
 
     processMessage(message) {
-        console.log('processMessage')
         if (this.context.isInitialState()) {
             return this._checkUserInputForCommand(message);
         }
@@ -72,15 +71,14 @@ module.exports = class Bot {
     }
 
     processPostBack(postBack) {
-        console.log('postBack', postBack, this.userId);
         return new Promise((resolve, reject) => {
             if (postBack === tmlConstants.SHOW_REMINDERS) {
-                resolve(resolve(this._getReminderListTemplate()));
+                resolve(this._getReminderListTemplate());
                 return;
             }
     
             if (postBack === tmlConstants.CREATE_REMINDER) {
-                this.context.setState(ctxConstants.CTX_WAIT_FOR_REMINDER_TEXT);
+                this.context.setState(rmdConstants.CTX_WAIT_FOR_REMINDER_TEXT);
                 resolve(reminderCreateTml(this.userId));
                 return;
             }
@@ -137,7 +135,7 @@ module.exports = class Bot {
             return;
         }
         const d = rem.date;
-        d.setMinutes(d.getMinutes() + ctxConstants.SNOOZE_TIME);
+        d.setMinutes(d.getMinutes() + rmdConstants.SNOOZE_TIME);
         rem.date = d;
         this.store.addReminder(this.userId, rem)
     }
@@ -146,12 +144,17 @@ module.exports = class Bot {
         return new Promise((resolve, reject) => {
             this.dialogFlow.message(message)
                 .then((queryResult) => {
-                        if (queryResult.action === 'reminders_list') {
-                                resolve(this._getReminderListTemplate());
+                        if (queryResult.action === rmdConstants.DF_GET_STARTED) {
+                            resolve(getStartedTml(this.userId));
                             return;
                         }
-                        if (queryResult.action === 'get_started') {
-                            resolve(getStartedTml(this.userId));
+                        if (queryResult.action === rmdConstants.DF_REMINDERS_LIST) {
+                            resolve(this._getReminderListTemplate());
+                            return;
+                        }
+                        if (queryResult.action === rmdConstants.DF_REMINDER_CREATE) {
+                            this.context.setState(rmdConstants.CTX_WAIT_FOR_REMINDER_TEXT);
+                            resolve(reminderCreateTml(this.userId));
                             return;
                         }
                         resolve(simpleResponseTml(this.userId, queryResult.fulfillmentText));
@@ -165,7 +168,7 @@ module.exports = class Bot {
     _saveReminderMessage(message) {
         return new Promise((resolve) => {
             this.context.collectReminderText(message);
-            this.context.setState(ctxConstants.CTX_WAIT_FOR_REMINDER_DATE);
+            this.context.setState(rmdConstants.CTX_WAIT_FOR_REMINDER_DATE);
             resolve(reminderTimeTml((this.userId)));
         });
     }
